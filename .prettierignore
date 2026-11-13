@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+src/generated/
+prisma/migrations/
+package-lock.json
+contract/
+STEPS.md
+README.md
+.schemathesis/
+schemathesis-report/
+.hypothesis/
