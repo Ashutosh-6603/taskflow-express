@@ -1,0 +1,14 @@
+{
+  "name": "taskflow-express",
+  "version": "1.0.0",
+  "description": "TaskFlow API: Express 5 + Prisma 7 + PostgreSQL + Redis",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  }
+}
