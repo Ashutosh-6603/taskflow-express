@@ -8,3 +8,5 @@ src/generated/
 .schemathesis/
 schemathesis-report/
 .hypothesis/
+
+/src/generated/prisma
