@@ -68,20 +68,140 @@ model WorkspaceMember {
   @@map("workspace_members")
 }
 
-// model Invitation {
-// }
+model Invitation {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  email       String
+  role        String
+  tokenHash   String    @unique @map("token_hash")
+  invitedBy   String    @map("invited_by") @db.Uuid
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt  DateTime? @map("accepted_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-// model Project {
-// }
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviter   User      @relation(fields: [invitedBy], references: [id])
 
-// model Task {
-// }
+  @@unique([workspaceId, email], map: "invitation_pending_email_uq", where: raw("accepted_at IS NULL"))
+  @@index([workspaceId, id], map: "invitation_workspace_idx", where: raw("accepted_at IS NULL"))
+  @@map("invitations")
+}
 
-// model Comment {
-// }
+model Project {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  name           String
+  key            String
+  description    String?
+  nextTaskNumber Int      @default(1) @map("next_task_number")
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-// model Attachment {
-// }
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator   User          @relation(fields: [createdBy], references: [id])
+  columns   BoardColumn[]
+  tasks     Task[]
+}
 
-// model ActivityEvent {
-// }
+model BoardColumn {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  name      String
+  position  String
+  wipLimit  Int?     @map("wip_limit")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@unique([projectId, position])
+  @@map("board_columns")
+}
+
+model Task {
+  id             String                   @id @default(uuid(7)) @db.Uuid
+  projectId      String                   @map("project_id") @db.Uuid
+  columnId       String                   @map("column_id") @db.Uuid
+  number         Int
+  title          String
+  description    String?
+  priority       String                   @default("medium")
+  assigneeId     String?                  @map("assignee_id") @db.Uuid
+  reporterId     String                   @map("reporter_id") @db.Uuid
+  dueAt          DateTime?                @map("due_at") @db.Timestamptz
+  reminderSentAt DateTime?                @map("reminder_sent_at") @db.Timestamptz
+  position       String
+  searchVector   Unsupported("tsvector")? @default(dbgenerated("(setweight(to_tsvector('english'::regconfig, title), 'A'::\"char\") || setweight(to_tsvector('english'::regconfig, COALESCE(description, ''::text)), 'B'::\"char\"))")) @map("search_vector")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  column      BoardColumn  @relation(fields: [columnId], references: [id], onDelete: NoAction)
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  reporter    User         @relation("TaskReporter", fields: [reporterId], references: [id])
+  comments    Comment[]
+  attachments Attachment[]
+
+  @@unique([projectId, number])
+  @@unique([columnId, position])
+  @@index([projectId, id], map: "tasks_project_idx")
+  @@index([assigneeId, id], map: "tasks_assignee_idx")
+  @@index([searchVector], map: "tasks_search_idx", type: Gin)
+  @@index([dueAt], map: "tasks_due_reminder_idx", where: raw("reminder_sent_at IS NULL AND assignee_id IS NOT NULL"))
+  @@map("tasks")
+}
+
+model Comment {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([taskId, id], map: "comments_task_idx")
+  @@map("comments")
+}
+
+model Attachment {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  uploaderId  String   @map("uploader_id") @db.Uuid
+  fileName    String   @map("file_name")
+  contentType String   @map("content_type")
+  sizeBytes   BigInt   @map("size_bytes")
+  storageKey  String   @unique @map("storage_key")
+  status      String   @default("pending")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploaderId], references: [id])
+
+  @@index([taskId, id], map: "attachments_task_idx", where: raw("status = 'ready'"))
+  @@index([createdAt], map: "attachments_pending_idx", where: raw("status = 'pending'"))
+  @@map("attachments")
+}
+
+model ActivityEvent {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  projectId   String?  @map("project_id") @db.Uuid
+  taskId      String?  @map("task_id") @db.Uuid
+  actorId     String   @map("actor_id") @db.Uuid
+  type        String
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User      @relation(fields: [actorId], references: [id])
+
+  @@index([workspaceId, id], map: "activity_workspace_idx")
+  @@index([projectId, id], map: "activity_project_idx", where: raw("project_id IS NOT NULL"))
+  @@index([taskId, id], map: "activity_task_idx", where: raw("task_id IS NOT NULL"))
+  @@map("activity_events")
+}
