@@ -21,17 +21,17 @@ model User {
   passwordHash String   @map("password_hash")
   displayName  String   @map("display_name")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  workspaceCreated Workspace[]       @relation("WorkspaceCreator")
-  memberships      WorkspaceMember[]
-  invitationsSent  Invitation[]
-  projectsCreated  Project[]
-  tasksAssigned    Task[]            @relation("TaskAssignee")
-  tasksReported    Task[]            @relation("TaskReporter")
-  comments         Comment[]
-  attachments      Attachment[]
-  activity         ActivityEvent[]
+  workspacesCreated Workspace[]       @relation("WorkspaceCreator")
+  memberships       WorkspaceMember[]
+  invitationsSent   Invitation[]
+  projectsCreated   Project[]
+  tasksAssigned     Task[]            @relation("TaskAssignee")
+  tasksReported     Task[]            @relation("TaskReporter")
+  comments          Comment[]
+  attachments       Attachment[]
+  activity          ActivityEvent[]
 
   @@map("users")
 }
@@ -42,7 +42,7 @@ model Workspace {
   slug      String   @unique
   createdBy String   @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   creator     User              @relation("WorkspaceCreator", fields: [createdBy], references: [id])
   members     WorkspaceMember[]
@@ -64,7 +64,7 @@ model WorkspaceMember {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
-  @@index([userId, workspaceId], map: "workspace_member_user_id_workspace_id_idx")
+  @@index([userId, workspaceId], map: "workspace_members_user_idx")
   @@map("workspace_members")
 }
 
@@ -82,8 +82,8 @@ model Invitation {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   inviter   User      @relation(fields: [invitedBy], references: [id])
 
-  @@unique([workspaceId, email], map: "invitation_pending_email_uq", where: raw("accepted_at IS NULL"))
-  @@index([workspaceId, id], map: "invitation_workspace_idx", where: raw("accepted_at IS NULL"))
+  @@unique([workspaceId, email], map: "invitations_pending_email_uq", where: raw("accepted_at IS NULL"))
+  @@index([workspaceId, id], map: "invitations_workspace_idx", where: raw("accepted_at IS NULL"))
   @@map("invitations")
 }
 
@@ -102,6 +102,10 @@ model Project {
   creator   User          @relation(fields: [createdBy], references: [id])
   columns   BoardColumn[]
   tasks     Task[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, id], map: "projects_workspace_idx")
+  @@map("projects")
 }
 
 model BoardColumn {
