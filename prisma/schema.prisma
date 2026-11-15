@@ -4,10 +4,84 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  displayName  String   @map("display_name")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  workspaceCreated Workspace[]       @relation("WorkspaceCreator")
+  memberships      WorkspaceMember[]
+  invitationsSent  Invitation[]
+  projectsCreated  Project[]
+  tasksAssigned    Task[]            @relation("TaskAssignee")
+  tasksReported    Task[]            @relation("TaskReporter")
+  comments         Comment[]
+  attachments      Attachment[]
+  activity         ActivityEvent[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  creator     User              @relation("WorkspaceCreator", fields: [createdBy], references: [id])
+  members     WorkspaceMember[]
+  invitations Invitation[]
+  projects    Project[]
+  activity    ActivityEvent[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  role        String
+  joinedAt    DateTime @default(now()) @map("joined_at") @db.Timestamptz
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId, workspaceId], map: "workspace_member_user_id_workspace_id_idx")
+  @@map("workspace_members")
+}
+
+// model Invitation {
+// }
+
+// model Project {
+// }
+
+// model Task {
+// }
+
+// model Comment {
+// }
+
+// model Attachment {
+// }
+
+// model ActivityEvent {
+// }
